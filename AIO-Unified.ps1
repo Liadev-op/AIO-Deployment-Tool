@@ -1,11 +1,11 @@
 <#
 .SYNOPSIS
-    AIO UNIFICADO - Instalador y Tweaks (v6.4 - Arranque Final Estabilizado)
+    AIO UNIFICADO - Instalador y Tweaks (v6.4 - Fix Definitivo de Carga Remota)
 .DESCRIPTION
-    Aísla la lógica de ejecución remota envolviendo todo el script principal en una función.
+    Implementa la carga secuencial de la configuración. La lógica de ruta local (Split-Path/Join-Path) se aísla de la ejecución remota para evitar errores de "Ruta vacía".
 .NOTES
     Autor: Gemini (Integración basada en el proyecto de Chris Titus)
-    Versión: 6.4 (Arranque Final Estable)
+    Versión: 6.4 (Carga Final Estabilizada)
     Fecha: 5 de noviembre de 2025
     
     REQUISITO: Necesita 'tweaks.json' en la misma ubicación (local o remota).
@@ -35,7 +35,7 @@ if (-not [System.Windows.Application]::Current) {
     New-Object System.Windows.Application | Out-Null
 }
 $App = [System.Windows.Application]::Current
-$script:Version = "6.4 (Arranque Final Estable)" # Versión actualizada
+$script:Version = "6.4 (Carga Final Estabilizada)" # Versión actualizada
 
 # Colores fijos (Violeta/Azul Dark Theme)
 $Colors = @{
@@ -767,9 +767,9 @@ function Start-AIOUnified {
 
 # --- Bloque de ejecución principal ---
 
+# Detectar si la ejecución es remota (irm | iex)
 $IsRemoteExecution = $MyInvocation.MyCommand.Definition.StartsWith("Invoke-RestMethod")
 $TweaksConfig = $null
-$PSScriptRoot = $null # Inicializado a nulo globalmente
 
 if ($IsRemoteExecution) {
     # Caso 1: Ejecución remota (irm | iex). Descargamos el JSON temporalmente.
@@ -785,12 +785,20 @@ if ($IsRemoteExecution) {
     } catch {
         Write-Warning "ERROR: No se pudo descargar 'tweaks.json' de GitHub. $($_.Exception.Message)"
         [System.Windows.MessageBox]::Show("ERROR: No se pudo cargar 'tweaks.json' desde la URL remota.", "Error de Carga", "OK", "Error"); 
-        # Si la carga remota falla, salimos.
         exit 1
     }
 } else {
     # Caso 2: Ejecución local (.\AIO-Unified.ps1). Usamos el archivo local.
-    $PSScriptRoot = Split-Path -Parent $MyInvocation.MyCommand.Definition
+    
+    # Intentar obtener la ruta del script solo en ejecución local
+    try {
+        $PSScriptRoot = Split-Path -Parent $MyInvocation.MyCommand.Definition
+    } catch {
+        # Esto no debería pasar en ejecución local, pero si pasa, salimos.
+        [System.Windows.MessageBox]::Show("ERROR interno al determinar la ruta del script local.", "Error de Arranque", "OK", "Error"); 
+        exit 1
+    }
+    
     $TweaksConfigPath = Join-Path $PSScriptRoot "tweaks.json" 
     
     if (-not (Test-Path $TweaksConfigPath)) { 
