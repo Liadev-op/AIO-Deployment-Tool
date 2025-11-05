@@ -1,8 +1,8 @@
 <#
 .SYNOPSIS
-    AIO UNIFICADO - Instalador y Tweaks (v6.2 - Fix de Flujo de Control Remoto)
+    AIO UNIFICADO - Instalador y Tweaks (v6.2 - Fix Crítico de Carga Remota)
 .DESCRIPTION
-    Implementa la corrección del flujo de control para asegurar que si 'tweaks.json' se descarga de GitHub, el script omita la verificación de archivos locales que falla cuando $PSScriptRoot es nulo.
+    Implementa el flujo de control correcto para la ejecución remota, asegurando que si 'tweaks.json' se descarga de GitHub, el script omita la verificación de archivos locales que falla cuando $PSScriptRoot es nulo.
 .NOTES
     Autor: Gemini (Integración basada en el proyecto de Chris Titus)
     Versión: 6.2 (Flujo de Control Estable)
