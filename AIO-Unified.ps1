@@ -1,11 +1,11 @@
 <#
 .SYNOPSIS
-    AIO UNIFICADO - Instalador y Tweaks (v6.1 - Integración Final y Fix de XAML)
+    AIO UNIFICADO - Instalador y Tweaks (v6.2 - Fix de Flujo de Control Remoto)
 .DESCRIPTION
-    Implementa la detección de ejecución remota (irm | iex) para descargar 'tweaks.json' de GitHub en tiempo de ejecución. El título XAML ha sido modificado para resolver el error persistente de "EntityName" en PowerShell/WPF.
+    Implementa la corrección del flujo de control para asegurar que si 'tweaks.json' se descarga de GitHub, el script omita la verificación de archivos locales que falla cuando $PSScriptRoot es nulo.
 .NOTES
     Autor: Gemini (Integración basada en el proyecto de Chris Titus)
-    Versión: 6.1 (Integración GitHub y Fix XAML)
+    Versión: 6.2 (Flujo de Control Estable)
     Fecha: 5 de noviembre de 2025
     
     REQUISITO: Necesita 'tweaks.json' en la misma ubicación (local o remota).
@@ -35,7 +35,7 @@ if (-not [System.Windows.Application]::Current) {
     New-Object System.Windows.Application | Out-Null
 }
 $App = [System.Windows.Application]::Current
-$script:Version = "6.1 (Integración GitHub y Fix XAML)" # Versión actualizada
+$script:Version = "6.2 (Flujo de Control Estable)" # Versión actualizada
 
 # Colores fijos (Violeta/Azul Dark Theme)
 $Colors = @{
@@ -470,6 +470,7 @@ function Invoke-AIOUnifiedGUI {
 
     # --- 1b. Detección de entorno y Carga de Tweaks ---
     $IsRemoteExecution = $MyInvocation.MyCommand.Definition.StartsWith("Invoke-RestMethod")
+    $IsLoaded = $false
     
     if ($IsRemoteExecution) {
         # Caso 1: Ejecución remota (irm | iex). Descargamos el JSON temporalmente.
@@ -481,13 +482,16 @@ function Invoke-AIOUnifiedGUI {
             $ContentRaw = Invoke-RestMethod -Uri $TweaksRemoteUrl -ErrorAction Stop
             $ContentClean = $ContentRaw.Trim() -replace '[\u0000-\u001F\u007F-\u009F]', ''
             $script:TweaksConfig = $ContentClean | ConvertFrom-Json
+            $IsLoaded = $true
             Write-Host "Configuración de Tweaks cargada exitosamente desde GitHub." -ForegroundColor Green
         } catch {
             Write-Warning "ERROR: No se pudo descargar 'tweaks.json' de GitHub. $($_.Exception.Message)"
             [System.Windows.MessageBox]::Show("ERROR: No se pudo cargar 'tweaks.json' desde la URL remota.", "Error de Carga", "OK", "Error"); 
             return
         }
-    } else {
+    } 
+    
+    if (-not $IsLoaded) {
         # Caso 2: Ejecución local (.\AIO-Unified.ps1). Usamos el archivo local.
         $script:PSScriptRoot = Split-Path -Parent $MyInvocation.MyCommand.Definition
         $TweaksConfigPath = Join-Path $script:PSScriptRoot "tweaks.json" 
@@ -513,7 +517,7 @@ function Invoke-AIOUnifiedGUI {
     $script:UseChocolatey = Test-Chocolatey
 
     # --- FIX CRÍTICO DEL TÍTULO DE LA VENTANA Y TAB ---
-    # La versión de XAML que tienes es muy estricta. Eliminamos el '&' completamente del XAML para evitar el error de parsing.
+    # Eliminamos el ampersand y hardcodeamos el título de la versión
     $WindowXAMLTitile = "AIO Installer and Tweaks (v$($script:Version))"
     # --- FIN DEL FIX ---
 
