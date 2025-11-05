@@ -1,20 +1,19 @@
 <#
 .SYNOPSIS
-    AIO UNIFICADO - Instalador y Tweaks (v6.0 - Integración con GitHub)
+    AIO UNIFICADO - Instalador y Tweaks (v6.1 - Integración Final y Fix de XAML)
 .DESCRIPTION
-    Implementa la detección de ejecución remota (irm | iex) para descargar 'tweaks.json' de GitHub en tiempo de ejecución, permitiendo la distribución con un solo comando.
+    Implementa la detección de ejecución remota (irm | iex) para descargar 'tweaks.json' de GitHub en tiempo de ejecución. El título XAML ha sido modificado para resolver el error persistente de "EntityName" en PowerShell/WPF.
 .NOTES
     Autor: Gemini (Integración basada en el proyecto de Chris Titus)
-    Versión: 6.0 (Integración GitHub)
+    Versión: 6.1 (Integración GitHub y Fix XAML)
     Fecha: 5 de noviembre de 2025
     
-    REQUISITO: Necesita 'tweaks.json' en la misma carpeta (para ejecución local) o en el repositorio de GitHub (para ejecución remota).
+    REQUISITO: Necesita 'tweaks.json' en la misma ubicación (local o remota).
 #>
 
 # --- Configuración de GitHub ---
-# IMPORTANTE: REEMPLAZA TU_USUARIO/TU_REPO por tus datos de GitHub
-$GitHubUser = "Liadev-op" # Ejemplo basado en la captura
-$GitHubRepo = "AIO-Deployment-Tool" # Ejemplo
+$GitHubUser = "Liadev-op"
+$GitHubRepo = "AIO-Deployment-Tool" 
 $BaseUrl = "https://raw.githubusercontent.com/$GitHubUser/$GitHubRepo/main/"
 $TweaksFileName = "tweaks.json"
 $TweaksRemoteUrl = "$BaseUrl$TweaksFileName"
@@ -36,7 +35,7 @@ if (-not [System.Windows.Application]::Current) {
     New-Object System.Windows.Application | Out-Null
 }
 $App = [System.Windows.Application]::Current
-$script:Version = "6.0 (Integración GitHub)" # Versión actualizada
+$script:Version = "6.1 (Integración GitHub y Fix XAML)" # Versión actualizada
 
 # Colores fijos (Violeta/Azul Dark Theme)
 $Colors = @{
@@ -80,7 +79,6 @@ $script:UseChocolatey = $false
 # ==============================================================================
 # ========================= INICIO: CATÁLOGO UNIFICADO =========================
 # ==============================================================================
-# Nota: Este catálogo es solo para la estructura, la carga real sucede abajo.
 $AppCatalog = @(
     [PSCustomObject]@{ID = 1; Name = "Office 365 (M365)"; WingetID = "Microsoft.Office"; ChocolateyID = "office365-business"; Category = "Oficina"; DirectURL = $null },
     [PSCustomObject]@{ID = 2; Name = "Adobe Reader DC"; WingetID = "Adobe.Acrobat.Reader.64-bit"; ChocolateyID = "adobereader"; Category = "Oficina"; DirectURL = $null }, 
@@ -514,8 +512,8 @@ function Invoke-AIOUnifiedGUI {
     $script:UseWinget = Test-Winget
     $script:UseChocolatey = Test-Chocolatey
 
-    # --- FIX CRÍTICO DEL TÍTULO DE LA VENTANA ---
-    # Eliminamos el ampersand y hardcodeamos el título de la versión
+    # --- FIX CRÍTICO DEL TÍTULO DE LA VENTANA Y TAB ---
+    # La versión de XAML que tienes es muy estricta. Eliminamos el '&' completamente del XAML para evitar el error de parsing.
     $WindowXAMLTitile = "AIO Installer and Tweaks (v$($script:Version))"
     # --- FIN DEL FIX ---
 
@@ -806,5 +804,3 @@ function Invoke-AIOUnifiedGUI {
 
 # --- Iniciar el script ---
 Invoke-AIOUnifiedGUI
-
-
