@@ -1,23 +1,15 @@
 <#
+
 .SYNOPSIS
-    AIO UNIFICADO - Instalador y Tweaks (v6.4 - Fix Definitivo de Carga Remota)
+    AIO UNIFICADO - Instalador y Tweaks (v5.5 - Archivo Único Completo)
 .DESCRIPTION
-    Implementa la carga secuencial de la configuración. La lógica de ruta local (Split-Path/Join-Path) se aísla de la ejecución remota para evitar errores de "Ruta vacía".
+    Implementa una nueva paleta de colores (Violeta/Azul) con JSON embebido internamente.
+    NO REQUIERE archivo tweaks.json externo.
 .NOTES
     Autor: Gemini (Integración basada en el proyecto de Chris Titus)
-    Versión: 6.4 (Carga Final Estabilizada)
+    Versión: 5.5 (Single File - Complete)
     Fecha: 5 de noviembre de 2025
-    
-    REQUISITO: Necesita 'tweaks.json' en la misma ubicación (local o remota).
 #>
-
-# --- Configuración de GitHub ---
-$GitHubUser = "Liadev-op"
-$GitHubRepo = "AIO-Deployment-Tool" 
-$BaseUrl = "https://raw.githubusercontent.com/$GitHubUser/$GitHubRepo/main/"
-$TweaksFileName = "tweaks.json"
-$TweaksRemoteUrl = "$BaseUrl$TweaksFileName"
-# --- Fin de Configuración de GitHub ---
 
 # --- PREPARACIÓN: Cargar las librerías de Windows para GUI ---
 try {
@@ -25,6 +17,319 @@ try {
 } catch {
     Write-Warning "ERROR: No se pudo cargar WPF. Asegúrese de tener .NET Framework."; Read-Host "Presione Enter para salir..."; exit 1
 }
+
+# ==============================================================================
+# === JSON EMBEBIDO COMPLETO (Reemplaza tweaks.json) ===
+# ==============================================================================
+$TweaksConfigJSON = @'
+{
+  "WPFTweaksAH": {
+    "Content": "Disable Activity History",
+    "Description": "This erases recent docs, clipboard, and run history.",
+    "category": "Essential Tweaks",
+    "panel": "1",
+    "Order": "a005_",
+    "registry": [
+      {
+        "Path": "HKLM:\\SOFTWARE\\Policies\\Microsoft\\Windows\\System",
+        "Name": "EnableActivityFeed",
+        "Type": "DWord",
+        "Value": "0",
+        "OriginalValue": "<RemoveEntry>"
+      },
+      {
+        "Path": "HKLM:\\SOFTWARE\\Policies\\Microsoft\\Windows\\System",
+        "Name": "PublishUserActivities",
+        "Type": "DWord",
+        "Value": "0",
+        "OriginalValue": "<RemoveEntry>"
+      },
+      {
+        "Path": "HKLM:\\SOFTWARE\\Policies\\Microsoft\\Windows\\System",
+        "Name": "UploadUserActivities",
+        "Type": "DWord",
+        "Value": "0",
+        "OriginalValue": "<RemoveEntry>"
+      }
+    ],
+    "link": "https://winutil.christitus.com/dev/tweaks/essential-tweaks/ah"
+  },
+  "WPFTweaksHiber": {
+    "Content": "Disable Hibernation",
+    "Description": "Hibernation is really meant for laptops as it saves what's in memory before turning the pc off. It really should never be used, but some people are lazy and rely on it. Don't be like Bob. Bob likes hibernation.",
+    "category": "Essential Tweaks",
+    "panel": "1",
+    "Order": "a005_",
+    "registry": [
+      {
+        "Path": "HKLM:\\System\\CurrentControlSet\\Control\\Session Manager\\Power",
+        "Name": "HibernateEnabled",
+        "Type": "DWord",
+        "Value": "0",
+        "OriginalValue": "1"
+      },
+      {
+        "Path": "HKLM:\\SOFTWARE\\Microsoft\\Windows\\CurrentVersion\\Explorer\\FlyoutMenuSettings",
+        "Name": "ShowHibernateOption",
+        "Type": "DWord",
+        "Value": "0",
+        "OriginalValue": "1"
+      }
+    ],
+    "InvokeScript": [
+      "powercfg.exe /hibernate off"
+    ],
+    "UndoScript": [
+      "powercfg.exe /hibernate on"
+    ],
+    "link": "https://winutil.christitus.com/dev/tweaks/essential-tweaks/hiber"
+  },
+  "WPFTweaksLaptopHibernation": {
+    "Content": "Set Hibernation as default (good for laptops)",
+    "Description": "Most modern laptops have connected standby enabled which drains the battery, this sets hibernation as default which will not drain the battery. See issue https://github.com/ChrisTitusTech/winutil/issues/1399",
+    "category": "Essential Tweaks",
+    "panel": "1",
+    "Order": "a014_",
+    "registry": [
+      {
+        "Path": "HKLM:\\SYSTEM\\CurrentControlSet\\Control\\Power\\PowerSettings\\238C9FA8-0AAD-41ED-83F4-97BE242C8F20\\7bc4a2f9-d8fc-4469-b07b-33eb785aaca0",
+        "OriginalValue": "1",
+        "Name": "Attributes",
+        "Value": "2",
+        "Type": "DWord"
+      },
+      {
+        "Path": "HKLM:\\SYSTEM\\CurrentControlSet\\Control\\Power\\PowerSettings\\abfc2519-3608-4c2a-94ea-171b0ed546ab\\94ac6d29-73ce-41a6-809f-6363ba21b47e",
+        "OriginalValue": "0",
+        "Name": "Attributes ",
+        "Value": "2",
+        "Type": "DWord"
+      }
+    ],
+    "InvokeScript": [
+      "\n      Write-Host \"Turn on Hibernation\"\n      Start-Process -FilePath powercfg -ArgumentList \"/hibernate on\" -NoNewWindow -Wait\n\n      # Set hibernation as the default action\n      Start-Process -FilePath powercfg -ArgumentList \"/change standby-timeout-ac 60\" -NoNewWindow -Wait\n      Start-Process -FilePath powercfg -ArgumentList \"/change standby-timeout-dc 60\" -NoNewWindow -Wait\n      Start-Process -FilePath powercfg -ArgumentList \"/change monitor-timeout-ac 10\" -NoNewWindow -Wait\n      Start-Process -FilePath powercfg -ArgumentList \"/change monitor-timeout-dc 1\" -NoNewWindow -Wait\n      "
+    ],
+    "UndoScript": [
+      "\n      Write-Host \"Turn off Hibernation\"\n      Start-Process -FilePath powercfg -ArgumentList \"/hibernate off\" -NoNewWindow -Wait\n\n      # Set standby to default values\n      Start-Process -FilePath powercfg -ArgumentList \"/change standby-timeout-ac 15\" -NoNewWindow -Wait\n      Start-Process -FilePath powercfg -ArgumentList \"/change standby-timeout-dc 15\" -NoNewWindow -Wait\n      Start-Process -FilePath powercfg -ArgumentList \"/change monitor-timeout-ac 15\" -NoNewWindow -Wait\n      Start-Process -FilePath powercfg -ArgumentList \"/change monitor-timeout-dc 15\" -NoNewWindow -Wait\n      "
+    ],
+    "link": "https://winutil.christitus.com/dev/tweaks/essential-tweaks/laptophibernation"
+  },
+  "WPFTweaksHome": {
+    "Content": "Disable Homegroup",
+    "Description": "Disables HomeGroup - HomeGroup is a password-protected home networking service that lets you share your stuff with other PCs that are currently running and connected to your network.",
+    "category": "Essential Tweaks",
+    "panel": "1",
+    "Order": "a005_",
+    "service": [
+      {
+        "Name": "HomeGroupListener",
+        "StartupType": "Manual",
+        "OriginalType": "Automatic"
+      },
+      {
+        "Name": "HomeGroupProvider",
+        "StartupType": "Manual",
+        "OriginalType": "Automatic"
+      }
+    ],
+    "link": "https://winutil.christitus.com/dev/tweaks/essential-tweaks/home"
+  },
+  "WPFTweaksLoc": {
+    "Content": "Disable Location Tracking",
+    "Description": "Disables Location Tracking...DUH!",
+    "category": "Essential Tweaks",
+    "panel": "1",
+    "Order": "a005_",
+    "registry": [
+      {
+        "Path": "HKLM:\\SOFTWARE\\Microsoft\\Windows\\CurrentVersion\\CapabilityAccessManager\\ConsentStore\\location",
+        "Name": "Value",
+        "Type": "String",
+        "Value": "Deny",
+        "OriginalValue": "Allow"
+      },
+      {
+        "Path": "HKLM:\\SOFTWARE\\Microsoft\\Windows NT\\CurrentVersion\\Sensor\\Overrides\\{BFA794E4-F964-4FDB-90F6-51056BFE4B44}",
+        "Name": "SensorPermissionState",
+        "Type": "DWord",
+        "Value": "0",
+        "OriginalValue": "1"
+      },
+      {
+        "Path": "HKLM:\\SYSTEM\\CurrentControlSet\\Services\\lfsvc\\Service\\Configuration",
+        "Name": "Status",
+        "Type": "DWord",
+        "Value": "0",
+        "OriginalValue": "1"
+      },
+      {
+        "Path": "HKLM:\\SYSTEM\\Maps",
+        "Name": "AutoUpdateEnabled",
+        "Type": "DWord",
+        "Value": "0",
+        "OriginalValue": "1"
+      }
+    ],
+    "link": "https://winutil.christitus.com/dev/tweaks/essential-tweaks/loc"
+  },
+  "WPFTweaksServices": {
+    "Content": "Set Services to Manual",
+    "Description": "Turns a bunch of system services to manual that don't need to be running all the time. This is pretty harmless as if the service is needed, it will simply start on demand.",
+    "category": "Essential Tweaks",
+    "panel": "1",
+    "Order": "a014_",
+    "service": [
+      {
+        "Name": "AJRouter",
+        "StartupType": "Disabled",
+        "OriginalType": "Manual"
+      },
+      {
+        "Name": "ALG",
+        "StartupType": "Manual",
+        "OriginalType": "Manual"
+      },
+      {
+        "Name": "DiagTrack",
+        "StartupType": "Disabled",
+        "OriginalType": "Automatic"
+      }
+    ],
+    "link": "https://winutil.christitus.com/dev/tweaks/essential-tweaks/services"
+  },
+  "WPFTweaksTele": {
+    "Content": "Disable Telemetry",
+    "Description": "Disables Microsoft Telemetry. Note: This will lock many Edge Browser settings. Microsoft spies heavily on you when using the Edge browser.",
+    "category": "Essential Tweaks",
+    "panel": "1",
+    "Order": "a003_",
+    "registry": [
+      {
+        "Path": "HKLM:\\SOFTWARE\\Microsoft\\Windows\\CurrentVersion\\Policies\\DataCollection",
+        "OriginalValue": "<RemoveEntry>",
+        "Name": "AllowTelemetry",
+        "Value": "0",
+        "Type": "DWord"
+      }
+    ],
+    "link": "https://winutil.christitus.com/dev/tweaks/essential-tweaks/tele"
+  },
+  "WPFTweaksWifi": {
+    "Content": "Disable Wi-Fi Sense",
+    "Description": "Wi-Fi Sense is a spying service that phones home all nearby scanned Wi-Fi networks and your current geographic location.",
+    "category": "Essential Tweaks",
+    "panel": "1",
+    "Order": "a005_",
+    "registry": [
+      {
+        "Path": "HKLM:\\Software\\Microsoft\\PolicyManager\\default\\WiFi\\AllowWiFiHotSpotReporting",
+        "Name": "Value",
+        "Type": "DWord",
+        "Value": "0",
+        "OriginalValue": "1"
+      },
+      {
+        "Path": "HKLM:\\Software\\Microsoft\\PolicyManager\\default\\WiFi\\AllowAutoConnectToWiFiSenseHotspots",
+        "Name": "Value",
+        "Type": "DWord",
+        "Value": "0",
+        "OriginalValue": "1"
+      }
+    ],
+    "link": "https://winutil.christitus.com/dev/tweaks/essential-tweaks/wifi"
+  },
+  "WPFTweaksConsumerFeatures": {
+    "Content": "Disable ConsumerFeatures",
+    "Description": "Windows 10 will not automatically install any games, third-party apps, or application links from the Windows Store for the signed-in user. Some default Apps will be inaccessible (eg. Phone Link)",
+    "category": "Essential Tweaks",
+    "panel": "1",
+    "Order": "a003_",
+    "registry": [
+      {
+        "Path": "HKLM:\\SOFTWARE\\Policies\\Microsoft\\Windows\\CloudContent",
+        "OriginalValue": "<RemoveEntry>",
+        "Name": "DisableWindowsConsumerFeatures",
+        "Value": "1",
+        "Type": "DWord"
+      }
+    ],
+    "link": "https://winutil.christitus.com/dev/tweaks/essential-tweaks/consumerfeatures"
+  },
+  "WPFTweaksEdgeDebloat": {
+    "Content": "Debloat Edge",
+    "Description": "Disables various telemetry options, popups, and other annoyances in Edge.",
+    "category": "Essential Tweaks",
+    "panel": "1",
+    "Order": "a016_",
+    "registry": [
+      {
+        "Path": "HKLM:\\SOFTWARE\\Policies\\Microsoft\\EdgeUpdate",
+        "Name": "CreateDesktopShortcutDefault",
+        "Type": "DWord",
+        "Value": "0",
+        "OriginalValue": "<RemoveEntry>"
+      }
+    ],
+    "link": "https://winutil.christitus.com/dev/tweaks/essential-tweaks/edgedebloat"
+  },
+  "WPFTweaksRestorePoint": {
+    "Content": "Create Restore Point",
+    "Description": "Creates a restore point at runtime in case a revert is needed from WinUtil modifications",
+    "category": "Essential Tweaks",
+    "panel": "1",
+    "Checked": "False",
+    "Order": "a001_",
+    "InvokeScript": [
+      "\n        # Check if System Restore is enabled for the main drive\n        try {\n            # Try getting restore points to check if System Restore is enabled\n            Enable-ComputerRestore -Drive \"$env:SystemDrive\"\n        } catch {\n            Write-Host \"An error occurred while enabling System Restore: $_\"\n        }\n      "
+    ],
+    "link": "https://winutil.christitus.com/dev/tweaks/essential-tweaks/restorepoint"
+  },
+  "WPFTweaksRemoveCopilot": {
+    "Content": "Disable Microsoft Copilot",
+    "Description": "Disables MS Copilot AI built into Windows since 23H2.",
+    "category": "z__Advanced Tweaks - CAUTION",
+    "panel": "1",
+    "Order": "a025_",
+    "registry": [
+      {
+        "Path": "HKLM:\\SOFTWARE\\Policies\\Microsoft\\Windows\\WindowsCopilot",
+        "Name": "TurnOffWindowsCopilot",
+        "Type": "DWord",
+        "Value": "1",
+        "OriginalValue": "<RemoveEntry>"
+      }
+    ],
+    "link": "https://winutil.christitus.com/dev/tweaks/z--advanced-tweaks---caution/removecopilot"
+  },
+  "WPFToggleDarkMode": {
+    "Content": "Dark Theme for Windows",
+    "Description": "Enable/Disable Dark Mode.",
+    "category": "Customize Preferences",
+    "panel": "2",
+    "Order": "a100_",
+    "Type": "Toggle",
+    "registry": [
+      {
+        "Path": "HKCU:\\SOFTWARE\\Microsoft\\Windows\\CurrentVersion\\Themes\\Personalize",
+        "Name": "AppsUseLightTheme",
+        "Value": "0",
+        "OriginalValue": "1",
+        "DefaultState": "false",
+        "Type": "DWord"
+      },
+      {
+        "Path": "HKCU:\\SOFTWARE\\Microsoft\\Windows\\CurrentVersion\\Themes\\Personalize",
+        "Name": "SystemUsesLightTheme",
+        "Value": "0",
+        "OriginalValue": "1",
+        "DefaultState": "false",
+        "Type": "DWord"
+      }
+    ],
+    "link": "https://winutil.christitus.com/dev/tweaks/customize-preferences/darkmode"
+  }
+}
+'@
 
 # ==============================================================================
 # === INICIALIZACIÓN GLOBAL Y COLORES HARDCODED (VIOLETA/AZUL) ===
@@ -35,16 +340,16 @@ if (-not [System.Windows.Application]::Current) {
     New-Object System.Windows.Application | Out-Null
 }
 $App = [System.Windows.Application]::Current
-$script:Version = "6.4 (Carga Final Estabilizada)" # Versión actualizada
+$script:Version = "5.5" # Versión actualizada
 
 # Colores fijos (Violeta/Azul Dark Theme)
 $Colors = @{
     'MainBackgroundColor' = '#13111C';       # Fondo general (Violeta muy oscuro)
-    'MainForegroundColor' = '#F7F7F7';       # Texto general (Blanco puro)
+    'MainForegroundColor' = '#bebebeff';       # Texto general (Blanco puro)
     'AccentColor'         = '#8338EC';       # Color de acento principal (Violeta Eléctrico)
-    'AccentHover'         = '#9C6AFF';       # Color de acento al pasar el ratón
-    'ItemBackground'      = '#303030';       # Fondo de Items 
-    'TabInactiveBackground' = '#252525';     # Fondo de Tab Inactivo
+    'AccentHover'         = '#7d3cffff';       # Color de acento al pasar el ratón
+    'ItemBackground'      = '#242230';       # Fondo de Items (Lila oscuro)
+    'TabInactiveBackground' = '#201E2A';     # Fondo de Tab Inactivo
     'ButtonInstall'       = '#3A86FF';       # Azul Zafiro (Botón de Instalación)
     'ButtonTweaks'        = '#4CAF50';       # Verde para botón de tweaks
     'ButtonForeground'    = '#FFFFFF';       # Color del texto del botón
@@ -69,6 +374,7 @@ $script:AccentBrush = Get-Brush $Colors.AccentColor
 # Variables de entorno
 $script:SuccessExitCodes = @(0, 3010, 1603)
 $script:ExecutionHistory = @{}
+$script:PSScriptRoot = Split-Path -Parent $MyInvocation.MyCommand.Definition
 $script:AllAppCheckBoxes = @()
 $script:AllTweakCheckBoxes = @()
 
@@ -823,3 +1129,4 @@ if ($IsRemoteExecution) {
 if ($TweaksConfig -ne $null) {
     Start-AIOUnified -TweaksConfig $TweaksConfig
 }
+
