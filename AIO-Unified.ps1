@@ -1,11 +1,11 @@
 <#
 .SYNOPSIS
-    AIO UNIFICADO - Instalador y Tweaks (v6.4 - Fix Definitivo de Flujo Remoto)
+    AIO UNIFICADO - Instalador y Tweaks (v6.4 - Arranque Final Estabilizado)
 .DESCRIPTION
-    Aísla completamente la lógica de manejo de archivos locales (Split-Path, Join-Path) del script remoto, resolviendo el error persistente de "Ruta vacía".
+    Aísla la lógica de ejecución remota envolviendo todo el script principal en una función.
 .NOTES
     Autor: Gemini (Integración basada en el proyecto de Chris Titus)
-    Versión: 6.4 (Flujo de Control Estable)
+    Versión: 6.4 (Arranque Final Estable)
     Fecha: 5 de noviembre de 2025
     
     REQUISITO: Necesita 'tweaks.json' en la misma ubicación (local o remota).
@@ -35,7 +35,7 @@ if (-not [System.Windows.Application]::Current) {
     New-Object System.Windows.Application | Out-Null
 }
 $App = [System.Windows.Application]::Current
-$script:Version = "6.4 (Flujo de Control Estable)" # Versión actualizada
+$script:Version = "6.4 (Arranque Final Estable)" # Versión actualizada
 
 # Colores fijos (Violeta/Azul Dark Theme)
 $Colors = @{
@@ -460,71 +460,29 @@ function Invoke-SelectedTweaks {
 # --------------------------------------------------------------------------------
 
 
-function Invoke-AIOUnifiedGUI {
+function Start-AIOUnified {
+    param($TweaksConfig)
     
-    # --- 1. Comprobaciones Previas ---
+    # Esta función contiene la lógica real de la GUI y la inicialización, y solo se llama
+    # después de que la configuración ($TweaksConfig) haya sido cargada exitosamente.
+    
+    $script:TweaksConfig = $TweaksConfig
+
+    # 1. Comprobaciones de Administrador, Chequeo de Gestores (Aquí no se usa Split-Path ni Join-Path)
     $Identity = [Security.Principal.WindowsIdentity]::GetCurrent()
     if (-NOT ([Security.Principal.WindowsPrincipal]$Identity).IsInRole([Security.Principal.WindowsBuiltInRole]::Administrator)) {
         Write-Warning "ERROR: Este script DEBE ejecutarse como Administrador."; Read-Host "Presione Enter para salir..."; return
     }
 
-    # --- 1b. Detección de entorno y Carga de Tweaks ---
-    $IsRemoteExecution = $MyInvocation.MyCommand.Definition.StartsWith("Invoke-RestMethod")
-    $IsLoaded = $false
-    
-    if ($IsRemoteExecution) {
-        # Caso 1: Ejecución remota (irm | iex). Descargamos el JSON temporalmente.
-        Write-Host "Ejecución remota detectada. Descargando configuración desde GitHub..." -ForegroundColor Cyan
-        try {
-            # Establecer una política de seguridad para la descarga (necesario para GitHub raw)
-            [Net.ServicePointManager]::SecurityProtocol = [Net.ServicePointManager]::SecurityProtocol -bor [Net.SecurityProtocolType]::Tls12
-            
-            $ContentRaw = Invoke-RestMethod -Uri $TweaksRemoteUrl -ErrorAction Stop
-            $ContentClean = $ContentRaw.Trim() -replace '[\u0000-\u001F\u007F-\u009F]', ''
-            $script:TweaksConfig = $ContentClean | ConvertFrom-Json
-            $IsLoaded = $true
-            Write-Host "Configuración de Tweaks cargada exitosamente desde GitHub." -ForegroundColor Green
-        } catch {
-            Write-Warning "ERROR: No se pudo descargar 'tweaks.json' de GitHub. $($_.Exception.Message)"
-            [System.Windows.MessageBox]::Show("ERROR: No se pudo cargar 'tweaks.json' desde la URL remota.", "Error de Carga", "OK", "Error"); 
-            return
-        }
-    } 
-    
-    # FIX CRÍTICO: SOLO INTENTAR CARGAR LOCALMENTE SI LA CARGA REMOTA FALLÓ O NO SE EJECUTÓ.
-    if (-not $IsLoaded) {
-        # Caso 2: Ejecución local (.\AIO-Unified.ps1). Usamos el archivo local.
-        # Estas líneas solo se ejecutan si $IsLoaded es false.
-        $script:PSScriptRoot = Split-Path -Parent $MyInvocation.MyCommand.Definition
-        $TweaksConfigPath = Join-Path $script:PSScriptRoot "tweaks.json" 
-        
-        if (-not (Test-Path $TweaksConfigPath)) { 
-            [System.Windows.MessageBox]::Show("ERROR: No se encuentra 'tweaks.json' en la carpeta local.", "Error de Archivo", "OK", "Error"); return
-        }
-
-        # Cargar el JSON de Tweaks (Lógica de tu script original)
-        try {
-            $ContentRaw = [System.IO.File]::ReadAllText($TweaksConfigPath)
-            $ContentClean = $ContentRaw.Trim() -replace '[\u0000-\u001F\u007F-\u009F]', ''
-            $script:TweaksConfig = $ContentClean | ConvertFrom-Json
-            
-            if ($null -eq $script:TweaksConfig -or $script:TweaksConfig.Count -eq 0) { throw "El archivo 'tweaks.json' está vacío o la conversión falló." }
-        } catch {
-            [System.Windows.MessageBox]::Show("Error fatal al leer 'tweaks.json': $($_.Exception.Message)", "Error de JSON", "OK", "Error"); return
-        }
-    }
-    # --- Fin de Detección y Carga ---
-    
     $script:UseWinget = Test-Winget
     $script:UseChocolatey = Test-Chocolatey
 
     # --- FIX CRÍTICO DEL TÍTULO DE LA VENTANA Y TAB ---
     $WindowXAMLTitile = "AIO Installer and Tweaks (v$($script:Version))"
+    $Host.UI.RawUI.WindowTitle = $WindowXAMLTitile
     # --- FIN DEL FIX ---
 
-    $Host.UI.RawUI.WindowTitle = $WindowXAMLTitile
-
-    # --- 2. Definición de la GUI (XAML) - Diseño Modernizado (FIX XAML) ---
+    # 2. Definición de la GUI (XAML) - Diseño Modernizado (FIX XAML)
     Write-Host "Cargando interfaz gráfica con diseño avanzado..." -ForegroundColor Yellow
     
     # XAML con estilos INLINE (hardcoded) para evitar errores de StaticResource
@@ -807,5 +765,53 @@ function Invoke-AIOUnifiedGUI {
     return $Window
 }
 
-# --- Iniciar el script ---
-Invoke-AIOUnifiedGUI
+# --- Bloque de ejecución principal ---
+
+$IsRemoteExecution = $MyInvocation.MyCommand.Definition.StartsWith("Invoke-RestMethod")
+$TweaksConfig = $null
+$PSScriptRoot = $null # Inicializado a nulo globalmente
+
+if ($IsRemoteExecution) {
+    # Caso 1: Ejecución remota (irm | iex). Descargamos el JSON temporalmente.
+    Write-Host "Ejecución remota detectada. Descargando configuración desde GitHub..." -ForegroundColor Cyan
+    try {
+        # Establecer una política de seguridad para la descarga
+        [Net.ServicePointManager]::SecurityProtocol = [Net.ServicePointManager]::SecurityProtocol -bor [Net.SecurityProtocolType]::Tls12
+        
+        $ContentRaw = Invoke-RestMethod -Uri $TweaksRemoteUrl -ErrorAction Stop
+        $ContentClean = $ContentRaw.Trim() -replace '[\u0000-\u001F\u007F-\u009F]', ''
+        $TweaksConfig = $ContentClean | ConvertFrom-Json
+        Write-Host "Configuración de Tweaks cargada exitosamente desde GitHub." -ForegroundColor Green
+    } catch {
+        Write-Warning "ERROR: No se pudo descargar 'tweaks.json' de GitHub. $($_.Exception.Message)"
+        [System.Windows.MessageBox]::Show("ERROR: No se pudo cargar 'tweaks.json' desde la URL remota.", "Error de Carga", "OK", "Error"); 
+        # Si la carga remota falla, salimos.
+        exit 1
+    }
+} else {
+    # Caso 2: Ejecución local (.\AIO-Unified.ps1). Usamos el archivo local.
+    $PSScriptRoot = Split-Path -Parent $MyInvocation.MyCommand.Definition
+    $TweaksConfigPath = Join-Path $PSScriptRoot "tweaks.json" 
+    
+    if (-not (Test-Path $TweaksConfigPath)) { 
+        [System.Windows.MessageBox]::Show("ERROR: No se encuentra 'tweaks.json' en la carpeta local.", "Error de Archivo", "OK", "Error"); 
+        exit 1
+    }
+
+    # Cargar el JSON de Tweaks (Lógica local)
+    try {
+        $ContentRaw = [System.IO.File]::ReadAllText($TweaksConfigPath)
+        $ContentClean = $ContentRaw.Trim() -replace '[\u0000-\u001F\u007F-\u009F]', ''
+        $TweaksConfig = $ContentClean | ConvertFrom-Json
+        
+        if ($null -eq $TweaksConfig -or $TweaksConfig.Count -eq 0) { throw "El archivo 'tweaks.json' está vacío o la conversión falló." }
+    } catch {
+        [System.Windows.MessageBox]::Show("Error fatal al leer 'tweaks.json': $($_.Exception.Message)", "Error de JSON", "OK", "Error"); 
+        exit 1
+    }
+}
+
+# Llama a la función principal SOLAMENTE si la configuración se cargó
+if ($TweaksConfig -ne $null) {
+    Start-AIOUnified -TweaksConfig $TweaksConfig
+}
