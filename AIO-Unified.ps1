@@ -15,7 +15,7 @@
 # IMPORTANTE: REEMPLAZA TU_USUARIO/TU_REPO por tus datos de GitHub
 $GitHubUser = "TU_USUARIO"
 $GitHubRepo = "TU_REPO" 
-$BaseUrl = "https://raw.githubusercontent.com/$GitHubUser/$GitHubRepo/main/"
+$BaseUrl = "https://github.com/Liadev-op/AIO-Deployment-Tool/edit/main"
 $TweaksFileName = "tweaks.json"
 $TweaksRemoteUrl = "$BaseUrl$TweaksFileName"
 # --- Fin de Configuración de GitHub ---
@@ -806,3 +806,4 @@ function Invoke-AIOUnifiedGUI {
 
 # --- Iniciar el script ---
 Invoke-AIOUnifiedGUI
+
