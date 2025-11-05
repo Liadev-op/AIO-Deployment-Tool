@@ -1,15 +1,24 @@
-﻿<#
+<#
 .SYNOPSIS
-    AIO UNIFICADO - Instalador y Tweaks (v5.4 - Nuevo Tema Violeta/Azul y Fix de Pestañas)
+    AIO UNIFICADO - Instalador y Tweaks (v6.0 - Integración con GitHub)
 .DESCRIPTION
-    Implementa una nueva paleta de colores (Violeta/Azul) y ajusta la configuración de estilo XAML de las pestañas para resolver el persistente problema de la banda blanca activa.
+    Implementa la detección de ejecución remota (irm | iex) para descargar 'tweaks.json' de GitHub en tiempo de ejecución, permitiendo la distribución con un solo comando.
 .NOTES
     Autor: Gemini (Integración basada en el proyecto de Chris Titus)
-    Versión: 5.4 (Nuevo Tema)
+    Versión: 6.0 (Integración GitHub)
     Fecha: 5 de noviembre de 2025
     
-    REQUISITO: Necesita 'tweaks.json' en la misma carpeta.
+    REQUISITO: Necesita 'tweaks.json' en la misma carpeta (para ejecución local) o en el repositorio de GitHub (para ejecución remota).
 #>
+
+# --- Configuración de GitHub ---
+# IMPORTANTE: REEMPLAZA TU_USUARIO/TU_REPO por tus datos de GitHub
+$GitHubUser = "TU_USUARIO"
+$GitHubRepo = "TU_REPO" 
+$BaseUrl = "https://raw.githubusercontent.com/$GitHubUser/$GitHubRepo/main/"
+$TweaksFileName = "tweaks.json"
+$TweaksRemoteUrl = "$BaseUrl$TweaksFileName"
+# --- Fin de Configuración de GitHub ---
 
 # --- PREPARACIÓN: Cargar las librerías de Windows para GUI ---
 try {
@@ -27,16 +36,16 @@ if (-not [System.Windows.Application]::Current) {
     New-Object System.Windows.Application | Out-Null
 }
 $App = [System.Windows.Application]::Current
-$script:Version = "5.4" # Versión actualizada
+$script:Version = "6.0 (Integración GitHub)" # Versión actualizada
 
 # Colores fijos (Violeta/Azul Dark Theme)
 $Colors = @{
     'MainBackgroundColor' = '#13111C';       # Fondo general (Violeta muy oscuro)
-    'MainForegroundColor' = '#bebebeff';       # Texto general (Blanco puro)
+    'MainForegroundColor' = '#F7F7F7';       # Texto general (Blanco puro)
     'AccentColor'         = '#8338EC';       # Color de acento principal (Violeta Eléctrico)
-    'AccentHover'         = '#7d3cffff';       # Color de acento al pasar el ratón
-    'ItemBackground'      = '#242230';       # Fondo de Items (Lila oscuro)
-    'TabInactiveBackground' = '#201E2A';     # Fondo de Tab Inactivo
+    'AccentHover'         = '#9C6AFF';       # Color de acento al pasar el ratón
+    'ItemBackground'      = '#303030';       # Fondo de Items 
+    'TabInactiveBackground' = '#252525';     # Fondo de Tab Inactivo
     'ButtonInstall'       = '#3A86FF';       # Azul Zafiro (Botón de Instalación)
     'ButtonTweaks'        = '#4CAF50';       # Verde para botón de tweaks
     'ButtonForeground'    = '#FFFFFF';       # Color del texto del botón
@@ -61,7 +70,6 @@ $script:AccentBrush = Get-Brush $Colors.AccentColor
 # Variables de entorno
 $script:SuccessExitCodes = @(0, 3010, 1603)
 $script:ExecutionHistory = @{}
-$script:PSScriptRoot = Split-Path -Parent $MyInvocation.MyCommand.Definition
 $script:AllAppCheckBoxes = @()
 $script:AllTweakCheckBoxes = @()
 
@@ -72,6 +80,7 @@ $script:UseChocolatey = $false
 # ==============================================================================
 # ========================= INICIO: CATÁLOGO UNIFICADO =========================
 # ==============================================================================
+# Nota: Este catálogo es solo para la estructura, la carga real sucede abajo.
 $AppCatalog = @(
     [PSCustomObject]@{ID = 1; Name = "Office 365 (M365)"; WingetID = "Microsoft.Office"; ChocolateyID = "office365-business"; Category = "Oficina"; DirectURL = $null },
     [PSCustomObject]@{ID = 2; Name = "Adobe Reader DC"; WingetID = "Adobe.Acrobat.Reader.64-bit"; ChocolateyID = "adobereader"; Category = "Oficina"; DirectURL = $null }, 
@@ -461,27 +470,50 @@ function Invoke-AIOUnifiedGUI {
         Write-Warning "ERROR: Este script DEBE ejecutarse como Administrador."; Read-Host "Presione Enter para salir..."; return
     }
 
-    $TweaksConfigPath = Join-Path $script:PSScriptRoot "tweaks.json" 
+    # --- 1b. Detección de entorno y Carga de Tweaks ---
+    $IsRemoteExecution = $MyInvocation.MyCommand.Definition.StartsWith("Invoke-RestMethod")
     
-    if (-not (Test-Path $TweaksConfigPath)) { 
-        [System.Windows.MessageBox]::Show("ERROR: No se encuentra 'tweaks.json'.", "Error de Archivo", "OK", "Error"); return
-    }
-
-    # --- Cargar el JSON de Tweaks ---
-    try {
-        $ContentRaw = [System.IO.File]::ReadAllText($TweaksConfigPath)
-        $ContentClean = $ContentRaw.Trim() -replace '[\u0000-\u001F\u007F-\u009F]', ''
-        $script:TweaksConfig = $ContentClean | ConvertFrom-Json
+    if ($IsRemoteExecution) {
+        # Caso 1: Ejecución remota (irm | iex). Descargamos el JSON temporalmente.
+        Write-Host "Ejecución remota detectada. Descargando configuración desde GitHub..." -ForegroundColor Cyan
+        try {
+            # Establecer una política de seguridad para la descarga (necesario para GitHub raw)
+            [Net.ServicePointManager]::SecurityProtocol = [Net.ServicePointManager]::SecurityProtocol -bor [Net.SecurityProtocolType]::Tls12
+            
+            $ContentRaw = Invoke-RestMethod -Uri $TweaksRemoteUrl -ErrorAction Stop
+            $ContentClean = $ContentRaw.Trim() -replace '[\u0000-\u001F\u007F-\u009F]', ''
+            $script:TweaksConfig = $ContentClean | ConvertFrom-Json
+            Write-Host "Configuración de Tweaks cargada exitosamente desde GitHub." -ForegroundColor Green
+        } catch {
+            Write-Warning "ERROR: No se pudo descargar 'tweaks.json' de GitHub. $($_.Exception.Message)"
+            [System.Windows.MessageBox]::Show("ERROR: No se pudo cargar 'tweaks.json' desde la URL remota.", "Error de Carga", "OK", "Error"); 
+            return
+        }
+    } else {
+        # Caso 2: Ejecución local (.\AIO-Unified.ps1). Usamos el archivo local.
+        $script:PSScriptRoot = Split-Path -Parent $MyInvocation.MyCommand.Definition
+        $TweaksConfigPath = Join-Path $script:PSScriptRoot "tweaks.json" 
         
-        if ($null -eq $script:TweaksConfig -or $script:TweaksConfig.Count -eq 0) { throw "El archivo 'tweaks.json' está vacío o la conversión falló." }
-    } catch {
-        [System.Windows.MessageBox]::Show("Error fatal al leer 'tweaks.json': $($_.Exception.Message)", "Error de JSON", "OK", "Error"); return
-    }
+        if (-not (Test-Path $TweaksConfigPath)) { 
+            [System.Windows.MessageBox]::Show("ERROR: No se encuentra 'tweaks.json' en la carpeta local.", "Error de Archivo", "OK", "Error"); return
+        }
 
-    # --- 1b. Chequeo de Gestores de Paquetes ---
+        # Cargar el JSON de Tweaks (Lógica de tu script original)
+        try {
+            $ContentRaw = [System.IO.File]::ReadAllText($TweaksConfigPath)
+            $ContentClean = $ContentRaw.Trim() -replace '[\u0000-\u001F\u007F-\u009F]', ''
+            $script:TweaksConfig = $ContentClean | ConvertFrom-Json
+            
+            if ($null -eq $script:TweaksConfig -or $script:TweaksConfig.Count -eq 0) { throw "El archivo 'tweaks.json' está vacío o la conversión falló." }
+        } catch {
+            [System.Windows.MessageBox]::Show("Error fatal al leer 'tweaks.json': $($_.Exception.Message)", "Error de JSON", "OK", "Error"); return
+        }
+    }
+    # --- Fin de Detección y Carga ---
+    
     $script:UseWinget = Test-Winget
     $script:UseChocolatey = Test-Chocolatey
-    
+
     # --- FIX CRÍTICO DEL TÍTULO DE LA VENTANA ---
     # Eliminamos el ampersand y hardcodeamos el título de la versión
     $WindowXAMLTitile = "AIO Installer and Tweaks (v$($script:Version))"
